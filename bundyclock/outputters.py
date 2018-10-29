@@ -10,19 +10,33 @@ import re
 import sqlite3
 import time
 
-
-def calc_tot_time(t_in, t_out):
-    delta_t = (datetime.datetime(*time.strptime(t_out, '%H:%M:%S')[:7]) -
-               datetime.datetime(*time.strptime(t_in, '%H:%M:%S')[:7]))
-
-    h, s = divmod(delta_t.seconds, 3600)
-    m, s = divmod(s, 60)
-
-    total_time = "%02d:%02d:%02d" % (h, m, s)
-    return total_time
+from abc import ABCMeta, abstractmethod
 
 
-class TextOutput:
+class BundyLedger:
+    __metaclass__ = ABCMeta
+
+    @abstractmethod
+    def in_signal(self):
+        pass
+
+    @abstractmethod
+    def out_signal(self):
+        pass
+
+    @staticmethod
+    def calc_tot_time(t_in, t_out):
+        delta_t = (datetime.datetime(*time.strptime(t_out, '%H:%M:%S')[:7]) -
+                   datetime.datetime(*time.strptime(t_in, '%H:%M:%S')[:7]))
+
+        h, s = divmod(delta_t.seconds, 3600)
+        m, s = divmod(s, 60)
+
+        total_time = "%02d:%02d:%02d" % (h, m, s)
+        return total_time
+
+
+class TextOutput(BundyLedger):
     def __init__(self, file_name):
         self.file = file_name
 
@@ -44,7 +58,7 @@ class TextOutput:
     def out_signal(self):
         out_time = time.strftime('%H:%M:%S')
         current = self.get_last_day()
-        total = calc_tot_time(current['in'], out_time)
+        total = self.calc_tot_time(current['in'], out_time)
         self.update_last_day(current['day'], current['in'], out_time, total)
 
     def get_last_day(self):
@@ -71,7 +85,7 @@ class TextOutput:
             fd.truncate()  # Remove dangling newlines at the end
 
 
-class JsonOutput(object):
+class JsonOutput(BundyLedger):
     """
 
     """
@@ -99,7 +113,7 @@ class JsonOutput(object):
         today.update({'out': time.strftime('%H:%M:%S')})
 
         # Update 'total'
-        total = calc_tot_time(today['in'], today['out'])
+        total = self.calc_tot_time(today['in'], today['out'])
         today.update({'total': total})
 
         # Update dict with new today's values
@@ -115,7 +129,7 @@ class JsonOutput(object):
         self.update_in_out()
 
 
-class SqLiteOutput(object):
+class SqLiteOutput(BundyLedger):
     """
 
     """
@@ -148,7 +162,7 @@ class SqLiteOutput(object):
         if current:
             # Update 'out'
             out = time.strftime('%H:%M:%S')
-            total = calc_tot_time(current['intime'], out)
+            total = self.calc_tot_time(current['intime'], out)
 
             cur = self.db.execute('UPDATE workdays SET outtime=?, total=? WHERE day=?', (
                 out,
