@@ -10,7 +10,7 @@ from subprocess import Popen, PIPE
 import argparse
 import contextlib
 import lockscreen
-import outputters
+import ledgers
 
 from pkg_resources import resource_string
 
@@ -86,19 +86,19 @@ def main():
         with working_dir(work_dir):
             if 'sqlite' in args.output:
                 filename = '{}.db'.format(args.file.split('.')[0])
-                output = outputters.SqLiteOutput(filename)
+                output = ledgers.SqLiteOutput(filename)
             elif 'json' in args.output:
                 filename = '{}.json'.format(args.file.split('.')[0])
-                output = outputters.JsonOutput(filename)
+                output = ledgers.JsonOutput(filename)
             elif 'text' in args.output:
                 filename = '{}.txt'.format(args.file.split('.')[0])
-                output = outputters.TextOutput(filename)
+                output = ledgers.TextOutput(filename)
 
             lock_screen_logger = lockscreen.LockScreen(output)
             output.in_signal()
             lock_screen_logger.start()
     else:
-        db = outputters.SqLiteOutput(
+        db = ledgers.SqLiteOutput(
             os.path.join(work_dir, '{}.db'.format(args.file.split('.')[0]))
         )
         db.update_in_out()
