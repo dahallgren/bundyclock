@@ -1,0 +1,12 @@
+[Unit]
+Description=Automatic Bundy Clock
+Requires=dbus.socket
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/bundyclock -d
+RemainAfterExit=no
+
+[Install]
+WantedBy=default.target
+
