@@ -24,6 +24,10 @@ class BundyLedger:
     def out_signal(self):
         pass
 
+    @abstractmethod
+    def get_today(self):
+        pass
+
     @staticmethod
     def calc_tot_time(t_in, t_out):
         delta_t = (datetime.datetime(*time.strptime(t_out, '%H:%M:%S')[:7]) -
@@ -34,6 +38,18 @@ class BundyLedger:
 
         total_time = "%02d:%02d:%02d" % (h, m, s)
         return total_time
+
+
+def ledger_factory(filename, output):
+    if 'sqlite' in output:
+        filename = '{}.db'.format(filename.split('.')[0])
+        return SqLiteOutput(filename)
+    elif 'json' in output:
+        filename = '{}.json'.format(filename.split('.')[0])
+        return JsonOutput(filename)
+    elif 'text' in output:
+        filename = '{}.txt'.format(filename.split('.')[0])
+        return TextOutput(filename)
 
 
 class TextOutput(BundyLedger):
@@ -73,6 +89,16 @@ class TextOutput(BundyLedger):
 
         return None
 
+    def get_today(self):
+        today = time.strftime('%Y.%m.%d')
+        with open(self.file, 'r') as fd:
+            for line in reversed(fd.readlines()):
+                r = re.match(
+                    r'(?P<day>{today}) - In: (?P<in>.*) Out: (?P<out>.*) Total: (?P<total>.*)\s*$'
+                    .format(today=today), line)
+                if r:
+                    return r.groupdict()
+
     def update_last_day(self, day, t_in, t_out, total):
         with open(self.file, 'r+') as fd:
             fd.seek(-56, os.SEEK_END)
@@ -99,8 +125,7 @@ class JsonOutput(BundyLedger):
         except IOError:
             my_times = {}
 
-        now = time.localtime()
-        key = time.strftime('%Y.%m.%d - %a', now)
+        key = time.strftime('%Y.%m.%d - %a')
 
         today = my_times.get(key, {'out': '17:00:00', 'total': '08:00:00'})
 
@@ -127,6 +152,13 @@ class JsonOutput(BundyLedger):
 
     def out_signal(self):
         self.update_in_out()
+
+    def get_today(self):
+        key = time.strftime('%Y.%m.%d - %a')
+
+        with open(self.file, 'r') as s:
+            my_times = json.load(s)
+            return my_times.get(key)
 
 
 class SqLiteOutput(BundyLedger):

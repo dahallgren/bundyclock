@@ -3,6 +3,7 @@
 """ Main """
 
 import os
+import pprint
 import sys
 
 from subprocess import Popen, PIPE
@@ -82,28 +83,18 @@ def main():
         print("Install was successful")
         sys.exit(0)
 
-    if args.daemon:
-        with working_dir(work_dir):
-            if 'sqlite' in args.output:
-                filename = '{}.db'.format(args.file.split('.')[0])
-                output = ledgers.SqLiteOutput(filename)
-            elif 'json' in args.output:
-                filename = '{}.json'.format(args.file.split('.')[0])
-                output = ledgers.JsonOutput(filename)
-            elif 'text' in args.output:
-                filename = '{}.txt'.format(args.file.split('.')[0])
-                output = ledgers.TextOutput(filename)
+    with working_dir(work_dir):
+        ledger = ledgers.ledger_factory(args.file, args.output)
 
-            lock_screen_logger = lockscreen.LockScreen(output)
-            output.in_signal()
+        if args.daemon:
+            lock_screen_logger = lockscreen.LockScreen(ledger)
+            ledger.in_signal()
             lock_screen_logger.start()
-    else:
-        db = ledgers.SqLiteOutput(
-            os.path.join(work_dir, '{}.db'.format(args.file.split('.')[0]))
-        )
-        db.update_in_out()
-        res = db.get_today()
-        print('{} - In: {} Out: {} Total: {}'.format(res['day'], res['intime'], res['outtime'], res['total']))
+        else:
+            pp = pprint.PrettyPrinter()
+            ledger.in_signal()
+            res = ledger.get_today()
+            pp.pprint(res)
 
 
 if __name__ == "__main__":
