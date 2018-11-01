@@ -40,15 +40,22 @@ class LockScreen(object):
 
     def _get_screen_saver_proxy(self):
         """ get dbus proxy object """
-        timeout = 10
+        timeout = 20
         ssp = None
         unity = False
 
-        if 'ubuntu' in os.environ.get('DESKTOP_SESSION'):
-            unity = True
-
         # When using systemd user service, we need to retry a couple of times before the bus is ready.
         while not ssp and timeout != 0:
+
+            try:
+                if 'ubuntu' in os.environ.get('DESKTOP_SESSION'):
+                    unity = True
+            except TypeError:
+                print("Failed to get DESKTOP_SESSION env, retrying")
+                timeout -= 1
+                sleep(1)
+                continue
+
             try:
                 if unity:
                     ssp = self.bus.get_object('com.canonical.Unity', '/com/canonical/Unity/Session')
