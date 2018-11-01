@@ -3,7 +3,6 @@
 """ Main """
 
 import os
-import pprint
 import sys
 
 from subprocess import Popen, PIPE
@@ -91,10 +90,8 @@ def main():
             ledger.in_signal()
             lock_screen_logger.start()
         else:
-            pp = pprint.PrettyPrinter()
-            ledger.in_signal()
-            res = ledger.get_today()
-            pp.pprint(res)
+            ledger.out_signal()
+            print(ledger.get_today())
 
 
 if __name__ == "__main__":

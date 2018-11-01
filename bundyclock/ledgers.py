@@ -40,6 +40,17 @@ class BundyLedger:
         return total_time
 
 
+class PunchTime(object):
+    def __init__(self, day, intime, outtime, total):
+        self.day = day
+        self.intime = intime
+        self.outtime = outtime
+        self.total = total
+
+    def __str__(self):
+        return '{} - In: {} Out: {} Total: {}'.format(self.day, self.intime, self.outtime, self.total)
+
+
 def ledger_factory(filename, output):
     if 'sqlite' in output:
         filename = '{}.db'.format(filename.split('.')[0])
@@ -97,7 +108,10 @@ class TextOutput(BundyLedger):
                     r'(?P<day>{today}) - In: (?P<in>.*) Out: (?P<out>.*) Total: (?P<total>.*)\s*$'
                     .format(today=today), line)
                 if r:
-                    return r.groupdict()
+                    return PunchTime(r.groupdict()['day'],
+                                     r.groupdict()['in'],
+                                     r.groupdict()['out'],
+                                     r.groupdict()['total'])
 
     def update_last_day(self, day, t_in, t_out, total):
         with open(self.file, 'r+') as fd:
@@ -158,7 +172,10 @@ class JsonOutput(BundyLedger):
 
         with open(self.file, 'r') as s:
             my_times = json.load(s)
-            return my_times.get(key)
+            return PunchTime(key,
+                             my_times.get(key)['in'],
+                             my_times.get(key)['out'],
+                             my_times.get(key)['total'])
 
 
 class SqLiteOutput(BundyLedger):
@@ -235,7 +252,7 @@ class SqLiteOutput(BundyLedger):
         cur = self.db.execute('SELECT day, intime, outtime, total FROM workdays WHERE day LIKE ?', (day + '%',))
         current = cur.fetchone()
 
-        return dict(current)
+        return PunchTime(**dict(current))
 
 
 def migrate_from_json(jsonfile, dbfile):
