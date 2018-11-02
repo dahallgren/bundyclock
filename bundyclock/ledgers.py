@@ -199,11 +199,31 @@ class SqLiteOutput(BundyLedger):
 
         self.db = db
 
-    def update_in_out(self):
-        now = time.localtime()
-        today = time.strftime('%Y.%m.%d', now)
+        user_version = db.execute('PRAGMA user_version').fetchone()[0]
+        if user_version < 1:
+            self._migrate_00_01_date_format()
 
-        cur = self.db.execute('SELECT day, intime, outtime, total FROM workdays WHERE day=?', (today,))
+    def _migrate_00_01_date_format(self):
+        print("Applying migration 'date format'")
+        cur = self.db.execute('SELECT day from workdays')
+        updated_rows = 0
+        all_rows = cur.fetchall()
+        for day in all_rows:
+            dot_day = day[0]
+            try:
+                dash_day = datetime.datetime.strptime(dot_day, '%Y.%m.%d').strftime('%Y-%m-%d')
+                self.db.execute('UPDATE workdays SET day=? WHERE day=?', (dash_day, dot_day))
+                updated_rows += 1
+            except ValueError:
+                continue
+
+        self.db.execute('PRAGMA user_version = 1')
+        self.db.commit()
+
+        print("Updated {} of {} rows".format(updated_rows, len(all_rows)))
+
+    def update_in_out(self):
+        cur = self.db.execute("SELECT day, intime, outtime, total FROM workdays WHERE day=date('now')")
         current = cur.fetchone()
         if current is not None:
             current = dict(current)
@@ -213,16 +233,14 @@ class SqLiteOutput(BundyLedger):
             out = time.strftime('%H:%M:%S')
             total = self.calc_tot_time(current['intime'], out)
 
-            cur = self.db.execute('UPDATE workdays SET outtime=?, total=? WHERE day=?', (
+            cur = self.db.execute("UPDATE workdays SET outtime=?, total=? WHERE day=date('now')", (
                 out,
                 total,
-                today,
                 ))
             self.db.commit()
         else:
             # Create 'intime', new day
-            cur = self.db.execute('INSERT INTO workdays VALUES (?,?,?,?)', (
-                today,
+            cur = self.db.execute("INSERT INTO workdays VALUES (date('now'),?,?,?)", (
                 time.strftime('%H:%M:%S'),
                 time.strftime('%H:%M:%S'),
                 '08:00:00'
@@ -246,13 +264,25 @@ class SqLiteOutput(BundyLedger):
         self.db.commit()
 
     def get_today(self, day=None):
-        if not day:
-            day = time.strftime('%Y.%m.%d')
-
-        cur = self.db.execute('SELECT day, intime, outtime, total FROM workdays WHERE day LIKE ?', (day + '%',))
+        cur = self.db.execute("SELECT day, intime, outtime, total FROM workdays WHERE day LIKE date('now')")
         current = cur.fetchone()
 
         return PunchTime(**dict(current))
+
+    def get_total_report(self, start_date=None, end_date=None):
+        if not start_date:
+            start_date = time.strftime('%Y-%m-01')
+        if not end_date:
+            end_date = time.strftime('%Y-%m-%d')
+
+        cur = self.db.execute(
+            """
+            SELECT time(SUM(strftime('%s', total)-strftime('%s', '00:00:00')), 'unixepoch')
+            from workdays
+            WHERE strftime('%s', day) BETWEEN strftime('%s', ?) AND strftime('%s', ?)
+            """, (start_date, end_date))
+
+        return cur.fetchone()[0]
 
 
 def migrate_from_json(jsonfile, dbfile):
