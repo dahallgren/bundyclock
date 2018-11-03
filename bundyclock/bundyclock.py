@@ -1,6 +1,10 @@
 #!/usr/bin/env python
 
-""" Main """
+"""
+
+Copyright (c) 2018 Dan Hallgren  <dan.hallgren@gmail.com>
+
+"""
 
 import os
 import sys

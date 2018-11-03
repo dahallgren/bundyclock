@@ -1,7 +1,7 @@
 """
 Created on Apr 6, 2013
 
-@author: dan
+Copyright (c) 2018 Dan Hallgren  <dan.hallgren@gmail.com>
 """
 import datetime
 import json
