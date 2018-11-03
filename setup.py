@@ -15,6 +15,6 @@ setup(
     },
     include_package_data=True,
     package_data={
-      'bundyclock': ['service_files/*'],
+      'bundyclock': ['service_files/*', 'templates/*'],
     },
 )

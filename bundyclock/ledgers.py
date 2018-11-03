@@ -264,10 +264,25 @@ class SqLiteOutput(BundyLedger):
         self.db.commit()
 
     def get_today(self, day=None):
-        cur = self.db.execute("SELECT day, intime, outtime, total FROM workdays WHERE day LIKE date('now')")
+        cur = self.db.execute("SELECT day, intime, outtime, total FROM workdays WHERE day = date('now')")
         current = cur.fetchone()
 
         return PunchTime(**dict(current))
+
+    def get_month(self, month=None):
+        if not month:
+            month = time.strftime('%Y-%m' + '-%')
+        else:
+            month = re.sub(r'(\d{4})-(\d{2}).*', r'\1-\2-%', month)
+
+        cur = self.db.execute(
+            """
+            SELECT *
+            from workdays
+            WHERE day LIKE ?
+            """, (month,))
+
+        return cur.fetchall()
 
     def get_total_report(self, start_date=None, end_date=None):
         if not start_date:
@@ -277,12 +292,19 @@ class SqLiteOutput(BundyLedger):
 
         cur = self.db.execute(
             """
-            SELECT time(SUM(strftime('%s', total)-strftime('%s', '00:00:00')), 'unixepoch')
+            SELECT SUM(strftime('%s', total)-strftime('%s', '00:00:00'))
             from workdays
             WHERE strftime('%s', day) BETWEEN strftime('%s', ?) AND strftime('%s', ?)
             """, (start_date, end_date))
 
-        return cur.fetchone()[0]
+        try:
+            h, s = divmod(cur.fetchone()[0], 3600)
+            m, s = divmod(s, 60)
+        except TypeError:
+            h, m, s = (0, 0, 0)
+
+        total_time = "%02d:%02d:%02d" % (h, m, s)
+        return total_time
 
 
 def migrate_from_json(jsonfile, dbfile):

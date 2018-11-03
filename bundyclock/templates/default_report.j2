@@ -1,0 +1,12 @@
+{% set lunch_break = 25 -%}
+
+Report for {{ month }}
+=====================
+
+{% for day in workdays -%}
+{{ day.day }}: In {{ day.intime }} Out: {{ day.outtime }} Total: {{ day.total }}
+{% endfor %}
+Total this month: {{ total_month }}
+{% set total_lunch = lunch_break *(workdays | length) -%}
+
+Total with avarage {{ lunch_break }} min. lunch: {{ total_month | lunch(total_lunch) }}

@@ -1,2 +1,4 @@
-include README
+include README.md
+include bundyclock/service_files/bundyclock.service
+recursive-include bundyclock/templates *
 

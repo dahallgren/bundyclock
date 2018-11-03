@@ -10,11 +10,14 @@ import os
 import sys
 
 from subprocess import Popen, PIPE
+from time import strftime
 
 import argparse
 import contextlib
 import lockscreen
 import ledgers
+import report
+
 
 from pkg_resources import resource_string
 
@@ -49,6 +52,11 @@ def main():
     parser.add_argument('-o', '--output',
                         help='output format "json|sqlite|text"', nargs=1, metavar='FORMAT',
                         choices=['json', 'sqlite', 'text'], default=['sqlite'])
+    parser.add_argument('--report', nargs='?', metavar='YYYY-MM',
+                        help='Generate monthly report', const=strftime('%Y-%m'))
+    parser.add_argument('--template', nargs=1, metavar='TEMPLATE_FILE',
+                        help='report template, only used with --report option',
+                        default=['default_report.j2'])
 
     args = parser.parse_args()
 
@@ -93,6 +101,10 @@ def main():
             lock_screen_logger = lockscreen.LockScreen(ledger)
             ledger.in_signal()
             lock_screen_logger.start()
+
+        elif args.report:
+            print(report.render(args.report, ledger, args.template[0]))
+
         else:
             ledger.out_signal()
             print(ledger.get_today())
