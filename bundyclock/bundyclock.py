@@ -6,25 +6,37 @@ Copyright (c) 2018 Dan Hallgren  <dan.hallgren@gmail.com>
 
 """
 
+import io
 import os
 import sys
 
+from pkg_resources import resource_string
 from subprocess import Popen, PIPE
 from time import strftime
 
 import argparse
+import ConfigParser
 import contextlib
 import lockscreen
 import ledgers
 import report
 
 
-from pkg_resources import resource_string
+CONFIG = """[bundyclock]
+# ledger_type, choose from (text, json, sqlite)
+ledger_type = sqlite
+ledger_file = in_out_times.db
+# jinja2 report template used with --report option
+template = default_report.j2
+url = "http://127.0.0.1/bundyclock"
+
+"""
+
+curr_dir = os.getcwd()
 
 
 @contextlib.contextmanager
 def working_dir(work_dir):
-    curr_dir = os.getcwd()
     try:
         os.chdir(work_dir)
         yield
@@ -37,9 +49,6 @@ def main():
     bundyclock CLI
     """
     parser = argparse.ArgumentParser(description='bundyclock')
-    parser.add_argument('--file',
-                        default='in_out_times.db',
-                        help='file with date times')
     parser.add_argument('--workdir',
                         default='.bundyclock',
                         help='dir path under home')
@@ -49,14 +58,10 @@ def main():
     parser.add_argument('-d', '--daemon',
                         help='start daemon mode',
                         action='store_true')
-    parser.add_argument('-o', '--output',
-                        help='output format "json|sqlite|text"', nargs=1, metavar='FORMAT',
-                        choices=['json', 'sqlite', 'text'], default=['sqlite'])
     parser.add_argument('--report', nargs='?', metavar='YYYY-MM',
                         help='Generate monthly report', const=strftime('%Y-%m'))
-    parser.add_argument('--template', nargs=1, metavar='TEMPLATE_FILE',
-                        help='report template, only used with --report option',
-                        default=['default_report.j2'])
+    parser.add_argument('--config', nargs=1, metavar='CONFIG_FILE',
+                        help='alternative configuration', default=['~/.bundyclock/bundyclock.cfg'])
 
     args = parser.parse_args()
 
@@ -95,7 +100,17 @@ def main():
         sys.exit(0)
 
     with working_dir(work_dir):
-        ledger = ledgers.ledger_factory(args.file, args.output)
+        config = ConfigParser.SafeConfigParser()
+
+        if not config.read(os.path.join(curr_dir, os.path.expanduser(args.config[0]))):
+            config.readfp(io.BytesIO(CONFIG))
+            with open(os.path.join(curr_dir, os.path.expanduser(args.config[0])), 'a') as s:
+                s.writelines(CONFIG)
+
+        ledger = ledgers.ledger_factory(
+            config.get('bundyclock', 'ledger_file'),
+            config.get('bundyclock', 'ledger_type')
+        )
 
         if args.daemon:
             lock_screen_logger = lockscreen.LockScreen(ledger)
@@ -103,7 +118,7 @@ def main():
             lock_screen_logger.start()
 
         elif args.report:
-            print(report.render(args.report, ledger, args.template[0]))
+            print(report.render(args.report, ledger, config.get('bundyclock', 'template')))
 
         else:
             ledger.out_signal()
