@@ -118,7 +118,10 @@ def main():
             lock_screen_logger.start()
 
         elif args.report:
-            print(report.render(args.report, ledger, config.get('bundyclock', 'template')))
+            if ledger.can_report:
+                print(report.render(args.report, ledger, config.get('bundyclock', 'template')))
+            else:
+                sys.exit('\t--report not supported by "{}" ledger type'.format(config.get('bundyclock', 'ledger_type')))
 
         else:
             ledger.out_signal()

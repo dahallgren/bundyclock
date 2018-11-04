@@ -15,6 +15,7 @@ from abc import ABCMeta, abstractmethod
 
 class BundyLedger:
     __metaclass__ = ABCMeta
+    can_report = False
 
     @abstractmethod
     def in_signal(self):
@@ -182,6 +183,8 @@ class SqLiteOutput(BundyLedger):
     """
 
     """
+    can_report = True
+
     def __init__(self, filename):
 
         db = sqlite3.connect(filename)
