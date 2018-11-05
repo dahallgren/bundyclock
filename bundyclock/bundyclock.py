@@ -23,12 +23,12 @@ import report
 
 
 CONFIG = """[bundyclock]
-# ledger_type, choose from (text, json, sqlite)
+# ledger_type, choose from (text, json, sqlite, http-rest)
 ledger_type = sqlite
 ledger_file = in_out_times.db
 # jinja2 report template used with --report option
 template = default_report.j2
-url = "http://127.0.0.1/bundyclock"
+url = http://localhost:8000/bundyclock/api/workdays/
 
 """
 
@@ -107,10 +107,7 @@ def main():
             with open(os.path.join(curr_dir, os.path.expanduser(args.config[0])), 'a') as s:
                 s.writelines(CONFIG)
 
-        ledger = ledgers.ledger_factory(
-            config.get('bundyclock', 'ledger_file'),
-            config.get('bundyclock', 'ledger_type')
-        )
+        ledger = ledgers.ledger_factory(**config._sections['bundyclock'])
 
         if args.daemon:
             lock_screen_logger = lockscreen.LockScreen(ledger)

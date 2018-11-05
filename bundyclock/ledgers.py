@@ -7,10 +7,12 @@ import datetime
 import json
 import os
 import re
+import requests
 import sqlite3
 import time
 
 from abc import ABCMeta, abstractmethod
+from calendar import monthrange
 
 
 class BundyLedger:
@@ -52,16 +54,20 @@ class PunchTime(object):
         return '{} - In: {} Out: {} Total: {}'.format(self.day, self.intime, self.outtime, self.total)
 
 
-def ledger_factory(filename, output):
+def ledger_factory(**kwargs):
+    output = kwargs.get('ledger_type')
+
     if 'sqlite' in output:
-        filename = '{}.db'.format(filename.split('.')[0])
+        filename = '{}.db'.format(kwargs.get('ledger_file').split('.')[0])
         return SqLiteOutput(filename)
     elif 'json' in output:
-        filename = '{}.json'.format(filename.split('.')[0])
+        filename = '{}.json'.format(kwargs.get('ledger_file').split('.')[0])
         return JsonOutput(filename)
     elif 'text' in output:
-        filename = '{}.txt'.format(filename.split('.')[0])
+        filename = '{}.txt'.format(kwargs.get('ledger_file').split('.')[0])
         return TextOutput(filename)
+    elif 'http-rest' in output:
+        return BundyHttpRest(kwargs.get('url'))
 
 
 class TextOutput(BundyLedger):
@@ -308,6 +314,117 @@ class SqLiteOutput(BundyLedger):
 
         total_time = "%02d:%02d:%02d" % (h, m, s)
         return total_time
+
+
+class BundyHttpRest(BundyLedger):
+    """
+
+    """
+    can_report = True
+
+    def __init__(self, url):
+        self.url = url
+
+    def update_in_out(self):
+        current_date = time.strftime('%Y-%m-%d')
+        item_url = self.url + current_date + r'/'
+
+        try:
+            r = requests.get(item_url)
+            if r.status_code == 404:
+                # Current date not found, lets create it
+                r = requests.post(self.url, data=dict(
+                    date=current_date,
+                    intime=time.strftime('%H:%M:S'),
+                    outtime=time.strftime('%H:%M:S'),
+                ))
+                r.raise_for_status()
+
+            elif r.status_code == 200:
+                # Update current data
+                punch_time = r.json()
+                punch_time['outtime'] = time.strftime('%H:%M:S')
+                r = requests.put(item_url, data=punch_time)
+                r.raise_for_status()
+
+            else:
+                print("Something went wrong: {}".format(r.status_code))
+                r.raise_for_status()
+
+        except (requests.exceptions.ConnectionError, requests.exceptions.HTTPError) as e:
+            print("Connection proplem: {}".format(e))
+
+    def in_signal(self):
+        self.update_in_out()
+
+    def out_signal(self):
+        self.update_in_out()
+
+    def get_today(self):
+        current_date = time.strftime('%Y-%m-%d')
+        item_url = self.url + current_date + r'/'
+        try:
+            r = requests.get(item_url)
+            if r.status_code == requests.codes.ok:
+                punch_time = r.json()
+                # rename pk
+                self._rename_pk(punch_time)
+
+                return PunchTime(**punch_time)
+            else:
+                r.raise_for_status()
+
+        except requests.exceptions.ConnectionError as e:
+            print("Connection proplem: {}".format(e))
+
+    def _rename_pk(self, punch_time):
+        punch_time['day'] = punch_time.pop('date')
+        return punch_time
+
+    def get_total_report(self, start_date=None, end_date=None):
+        if not start_date:
+            start_date = time.strftime('%Y-%m-01')
+        if not end_date:
+            end_date = time.strftime('%Y-%m-%d')
+
+        url = '{base_url}total_sum/?start_date={start_date}&end_date={end_date}'.format(
+            base_url=self.url,
+            start_date=start_date,
+            end_date=end_date
+        )
+        try:
+            r = requests.get(url)
+            if r.status_code == requests.codes.ok:
+                total_sum = r.json()
+
+                return total_sum['total_sum']
+            else:
+                r.raise_for_status()
+
+        except requests.exceptions.ConnectionError as e:
+            print("Connection proplem: {}".format(e))
+
+    def get_month(self, year_month=None):
+        if not year_month:
+            year_month = time.strftime('%Y-%m')
+
+        start_date = year_month + '-01'
+        last_day_of_month = monthrange(*map(int, year_month.split('-')[:2]))[1]
+        end_date = '{}-{}'.format(year_month, last_day_of_month)
+
+        url = self.url + '?start_date={}&end_date={}'.format(start_date, end_date)
+        try:
+            r = requests.get(url)
+            if r.status_code == requests.codes.ok:
+                workdays = r.json()
+                workdays = map(self._rename_pk, workdays)
+
+                return workdays
+            else:
+                r.raise_for_status()
+
+        except requests.exceptions.ConnectionError as e:
+            print("Connection proplem: {}".format(e))
 
 
 def migrate_from_json(jsonfile, dbfile):
