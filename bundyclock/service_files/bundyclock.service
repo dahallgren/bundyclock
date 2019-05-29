@@ -4,6 +4,8 @@ Requires=dbus.socket
 
 [Service]
 Type=simple
+Restart=always
+RestartSec=30
 ExecStart=/usr/bin/bundyclock -d
 RemainAfterExit=no
 
