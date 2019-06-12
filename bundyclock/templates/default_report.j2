@@ -3,7 +3,7 @@
 Report for {{ month }}
 =====================
 
-{% for day in (workdays|sort(reverse=True)) -%}
+{% for day in (workdays|sort(attribute='day')) -%}
 {{ day.day }}: In {{ day.intime }} Out: {{ day.outtime }} Total: {{ day.total }}
 {% endfor %}
 Total this month: {{ total_month }}
