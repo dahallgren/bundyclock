@@ -16,8 +16,8 @@ class LockScreen(object):
     """ Logger for lock/unlock screen """
     def __init__(self, outputter):
         DBusGMainLoop(set_as_default=True)
-        import gobject
-        self.loop = gobject.MainLoop()
+        from gi.repository import GObject
+        self.loop = GObject.MainLoop()
         self.bus = dbus.SessionBus()
         self.outputter = outputter
 

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 """
 
@@ -15,11 +15,11 @@ from subprocess import Popen, PIPE
 from time import strftime
 
 import argparse
-import ConfigParser
+import configparser
 import contextlib
-import lockscreen
-import ledgers
-import report
+import bundyclock.lockscreen as lockscreen
+import bundyclock.ledgers as ledgers
+import bundyclock.report as report
 
 
 CONFIG = """[bundyclock]
@@ -78,7 +78,7 @@ def main():
 
         service_file = resource_string(__name__, 'service_files/bundyclock.service')
 
-        with open(os.path.join(sysd_user_dir, 'bundyclock.service'), 'w+') as s:
+        with open(os.path.join(sysd_user_dir, 'bundyclock.service'), 'wb+') as s:
             s.write(service_file)
 
         p = Popen('systemctl --user daemon-reload'.split(), stdout=PIPE, stderr=PIPE)
@@ -100,7 +100,7 @@ def main():
         sys.exit(0)
 
     with working_dir(work_dir):
-        config = ConfigParser.SafeConfigParser()
+        config = configparser.SafeConfigParser()
 
         if not config.read(os.path.join(curr_dir, os.path.expanduser(args.config[0]))):
             config.readfp(io.BytesIO(CONFIG))

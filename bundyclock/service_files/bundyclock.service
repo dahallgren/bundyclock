@@ -6,7 +6,7 @@ Requires=dbus.socket
 Type=simple
 Restart=always
 RestartSec=30
-ExecStart=/usr/bin/bundyclock -d
+ExecStart=/usr/local/bin/bundyclock -d
 RemainAfterExit=no
 
 [Install]
