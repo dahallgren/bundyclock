@@ -9,17 +9,20 @@ Copyright (c) 2018 Dan Hallgren  <dan.hallgren@gmail.com>
 import io
 import os
 import sys
+import argparse
+import configparser
+import contextlib
+import logging
 
 from pkg_resources import resource_string
 from subprocess import Popen, PIPE
 from time import strftime
+from . import lockscreen
+from . import ledgers
+from . import report
 
-import argparse
-import configparser
-import contextlib
-import bundyclock.lockscreen as lockscreen
-import bundyclock.ledgers as ledgers
-import bundyclock.report as report
+
+logger = logging.getLogger(__name__)
 
 
 CONFIG = """[bundyclock]
@@ -73,7 +76,7 @@ def main():
     if args.install:
         sysd_user_dir = os.path.join(home, '.config', 'systemd', 'user')
         if not os.path.exists(sysd_user_dir):
-            print('Creating systemd user dir')
+            logger.info('Creating systemd user dir')
             os.mkdir(sysd_user_dir)
 
         service_file = resource_string(__name__, 'service_files/bundyclock.service')
@@ -96,7 +99,7 @@ def main():
         if p.returncode:
             raise Exception(' '.join([std_out, std_err]))
 
-        print("Install was successful")
+        logger.info("Install was successful")
         sys.exit(0)
 
     with working_dir(work_dir):

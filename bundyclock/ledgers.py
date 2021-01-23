@@ -14,6 +14,10 @@ import time
 from abc import ABCMeta, abstractmethod
 from calendar import monthrange
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 class BundyLedger:
     __metaclass__ = ABCMeta
@@ -213,7 +217,7 @@ class SqLiteOutput(BundyLedger):
             self._migrate_00_01_date_format()
 
     def _migrate_00_01_date_format(self):
-        print("Applying migration 'date format'")
+        logger.info("Applying migration 'date format'")
         cur = self.db.execute('SELECT day from workdays')
         updated_rows = 0
         all_rows = cur.fetchall()
@@ -229,7 +233,7 @@ class SqLiteOutput(BundyLedger):
         self.db.execute('PRAGMA user_version = 1')
         self.db.commit()
 
-        print("Updated {} of {} rows".format(updated_rows, len(all_rows)))
+        logger.info("Updated {} of {} rows".format(updated_rows, len(all_rows)))
 
     def update_in_out(self):
         cur = self.db.execute("SELECT day, intime, outtime, total FROM workdays WHERE day=date('now')")
@@ -348,11 +352,11 @@ class BundyHttpRest(BundyLedger):
                 r.raise_for_status()
 
             else:
-                print("Something went wrong: {}".format(r.status_code))
+                logger.error("Something went wrong: {}".format(r.status_code))
                 r.raise_for_status()
 
         except (requests.exceptions.ConnectionError, requests.exceptions.HTTPError) as e:
-            print("Connection proplem: {}".format(e))
+            logger.exception("Connection proplem: {}".format(e))
 
     def in_signal(self):
         self.update_in_out()
@@ -375,7 +379,7 @@ class BundyHttpRest(BundyLedger):
                 r.raise_for_status()
 
         except requests.exceptions.ConnectionError as e:
-            print("Connection proplem: {}".format(e))
+            logger.exception("Connection proplem: {}".format(e))
 
     def _rename_pk(self, punch_time):
         punch_time['day'] = punch_time.pop('date')
@@ -402,7 +406,7 @@ class BundyHttpRest(BundyLedger):
                 r.raise_for_status()
 
         except requests.exceptions.ConnectionError as e:
-            print("Connection proplem: {}".format(e))
+            logger.exception("Connection proplem: {}".format(e))
 
     def get_month(self, year_month=None):
         if not year_month:
@@ -424,7 +428,7 @@ class BundyHttpRest(BundyLedger):
                 r.raise_for_status()
 
         except requests.exceptions.ConnectionError as e:
-            print("Connection proplem: {}".format(e))
+            logger.exception("Connection proplem: {}".format(e))
 
 
 def migrate_from_json(jsonfile, dbfile):
@@ -437,5 +441,5 @@ def migrate_from_json(jsonfile, dbfile):
         try:
             db.insert_new_entry(day, times['in'], times['out'], times['total'])
         except sqlite3.IntegrityError as e:
-            print(day)
+            logger.exception(day)
             raise e
