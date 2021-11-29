@@ -17,7 +17,16 @@ import logging
 from pkg_resources import resource_string
 from subprocess import Popen, PIPE
 from time import strftime
-from . import lockscreen
+from sys import platform
+if platform == "linux" or platform == "linux2":
+    # linux
+    from . import lockscreen
+elif platform == "darwin":
+    from . import cocoaevent as lockscreen
+    # OS X
+elif platform == "win32":
+    raise Exception("Platform not supported")
+
 from . import ledgers
 from . import report
 
@@ -106,7 +115,7 @@ def main():
         config = configparser.SafeConfigParser()
 
         if not config.read(os.path.join(curr_dir, os.path.expanduser(args.config[0]))):
-            config.readfp(io.BytesIO(CONFIG))
+            config.readfp(io.StringIO(CONFIG))
             with open(os.path.join(curr_dir, os.path.expanduser(args.config[0])), 'a') as s:
                 s.writelines(CONFIG)
 
