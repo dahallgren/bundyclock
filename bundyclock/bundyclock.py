@@ -25,7 +25,8 @@ elif platform == "darwin":
     from . import cocoaevent as lockscreen
     # OS X
 elif platform == "win32":
-    raise Exception("Platform not supported")
+    # Windows
+    from . import wmilockscreen as lockscreen
 
 from . import ledgers
 from . import report
