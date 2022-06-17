@@ -83,7 +83,7 @@ class TextOutput(BundyLedger):
         today = time.strftime('%Y.%m.%d')
 
         if current is None or current['day'] != today:
-            with open(self.file, 'a') as fd:
+            with open(self.file, 'ab') as fd:
                 if current is not None:
                     fd.seek(-1, os.SEEK_END)  # Skip last newline
                 fd.write('{} - In: {} Out: {} Total: {}\n'.format(
@@ -91,7 +91,7 @@ class TextOutput(BundyLedger):
                     time.strftime('%H:%M:%S'),
                     time.strftime('%H:%M:%S'),
                     '00:00:00'
-                ))
+                ).encode())
 
     def out_signal(self):
         out_time = time.strftime('%H:%M:%S')
@@ -101,10 +101,10 @@ class TextOutput(BundyLedger):
 
     def get_last_day(self):
         try:
-            with open(self.file, 'r') as fd:
+            with open(self.file, 'rb') as fd:
                 fd.seek(-56, os.SEEK_END)
                 lastline = fd.readline()
-            r = re.match(r'(?P<day>.*) - In: (?P<in>.*) Out: (?P<out>.*) Total: (?P<total>.*)\s*$', lastline)
+            r = re.match(r'(?P<day>.*) - In: (?P<in>.*) Out: (?P<out>.*) Total: (?P<total>.*)\s*$', lastline.decode())
             return r.groupdict()
         except IOError:
             pass
@@ -113,11 +113,11 @@ class TextOutput(BundyLedger):
 
     def get_today(self):
         today = time.strftime('%Y.%m.%d')
-        with open(self.file, 'r') as fd:
+        with open(self.file, 'rb') as fd:
             for line in reversed(fd.readlines()):
                 r = re.match(
                     r'(?P<day>{today}) - In: (?P<in>.*) Out: (?P<out>.*) Total: (?P<total>.*)\s*$'
-                    .format(today=today), line)
+                    .format(today=today), line.decode())
                 if r:
                     return PunchTime(r.groupdict()['day'],
                                      r.groupdict()['in'],
@@ -125,14 +125,14 @@ class TextOutput(BundyLedger):
                                      r.groupdict()['total'])
 
     def update_last_day(self, day, t_in, t_out, total):
-        with open(self.file, 'r+') as fd:
+        with open(self.file, 'r+b') as fd:
             fd.seek(-56, os.SEEK_END)
             fd.write('{} - In: {} Out: {} Total: {}\n'.format(
                 day,
                 t_in,
                 t_out,
                 total
-            ))
+            ).encode())
             fd.truncate()  # Remove dangling newlines at the end
 
 
