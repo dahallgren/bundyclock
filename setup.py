@@ -12,6 +12,9 @@ setup(
         "console_scripts": [
             "bundyclock = bundyclock.bundyclock:main",
         ],
+        "gui_scripts": [
+            "bundyclockw = bundyclock.bundyclock:main",
+        ],
     },
     include_package_data=True,
     package_data={

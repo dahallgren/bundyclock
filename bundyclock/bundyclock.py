@@ -18,6 +18,8 @@ from pkg_resources import resource_string
 from subprocess import Popen, PIPE
 from time import strftime
 from sys import platform
+
+import bundyclock
 if platform == "linux" or platform == "linux2":
     # linux
     from . import lockscreen
@@ -39,6 +41,10 @@ CONFIG = """[bundyclock]
 # ledger_type, choose from (text, json, sqlite, http-rest)
 ledger_type = sqlite
 ledger_file = in_out_times.db
+
+# logging, default is to stdout. Uncomment to log to file
+# log_file = bundyclock.log
+
 # jinja2 report template used with --report option
 template = default_report.j2
 url = http://localhost:8000/bundyclock/api/workdays/
@@ -55,6 +61,14 @@ def working_dir(work_dir):
         yield
     finally:
         os.chdir(curr_dir)
+
+
+def setup_file_logger(log_file):
+    fileHandler = logging.FileHandler(log_file)
+    logFormatter = logging.Formatter(bundyclock.LOG_FORMAT)
+    fileHandler.setFormatter(logFormatter)
+    rootLogger = logging.getLogger()
+    rootLogger.addHandler(fileHandler)
 
 
 def main():
@@ -119,6 +133,10 @@ def main():
             config.readfp(io.StringIO(CONFIG))
             with open(os.path.join(curr_dir, os.path.expanduser(args.config[0])), 'a') as s:
                 s.writelines(CONFIG)
+
+        log_file_name = config._sections['bundyclock'].get('log_file', None)
+        if log_file_name:
+            setup_file_logger(log_file=log_file_name)
 
         ledger = ledgers.ledger_factory(**config._sections['bundyclock'])
 
