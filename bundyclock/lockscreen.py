@@ -3,15 +3,15 @@ Created on Apr 4, 2013
 
 Copyright (c) 2018 Dan Hallgren  <dan.hallgren@gmail.com>
 """
-import os
-import signal
-
-from time import sleep
-
 import dbus
-from dbus.mainloop.glib import DBusGMainLoop
-
 import logging
+import os
+import pystray
+import signal
+from time import sleep
+from .platformctx import PunchStrategy
+from .ledgers import ledger_factory
+from . import _icon
 
 logger = logging.getLogger(__name__)
 
@@ -19,13 +19,12 @@ logger = logging.getLogger(__name__)
 class LockScreen(object):
     """ Logger for lock/unlock screen """
     def __init__(self, outputter):
+        from dbus.mainloop.glib import DBusGMainLoop
         DBusGMainLoop(set_as_default=True)
         from gi.repository import GObject
         self.loop = GObject.MainLoop()
         self.bus = dbus.SessionBus()
         self.outputter = outputter
-
-        self.outputter.in_signal()
 
         self.screen_saver_proxy, is_unity = self._get_screen_saver_proxy()
 
@@ -38,9 +37,6 @@ class LockScreen(object):
                                                       self.gnome_handler,
                                                       dbus_interface='org.gnome.ScreenSaver')
             logger.info('Enabling gnome screen saver watcher')
-
-        # Register sigterm handler
-        signal.signal(signal.SIGTERM, self.sigterm_handler)
 
     def _get_screen_saver_proxy(self):
         """ get dbus proxy object """
@@ -65,7 +61,7 @@ class LockScreen(object):
                     ssp = self.bus.get_object('com.canonical.Unity', '/com/canonical/Unity/Session')
                 else:
                     ssp = self.bus.get_object('org.gnome.ScreenSaver', '/org/gnome/ScreenSaver')
-            except dbus.exceptions.DBusException as e:
+            except dbus.exceptions.DBusException:
                 logger.info('Failed to get dbus object, retrying')
                 timeout -= 1
                 sleep(1)
@@ -94,11 +90,6 @@ class LockScreen(object):
         logger.debug('Unity unlock screen')
         self.outputter.in_signal()
 
-    def sigterm_handler(self, *args, **kwargs):
-        """ Gracefully shutdown, put last entry to time logger"""
-        self.outputter.out_signal()
-        logger.info("Killed by sigterm, shutting down")
-
     def start(self):
         """ start main loop """
         try:
@@ -106,3 +97,46 @@ class LockScreen(object):
         except KeyboardInterrupt:
             self.outputter.out_signal()
             logger.exception("KeyboardInterrrupt, shutting down")
+        logger.debug('lockscreen loop stopped')
+
+    def stop(self):
+        self.loop.quit()
+
+
+class LinuxStrategy(PunchStrategy):
+    def __init__(self, **kwargs):
+        self.config = kwargs
+        self.ledger = ledger_factory(**self.config)
+        self.ledger.in_signal()
+
+        self.app = pystray.Icon(
+            'bundyclock',
+            icon=_icon.create_image(64, 64, 'black', 'white'),
+            menu=pystray.Menu(
+                pystray.MenuItem('quit', self.after_click),
+            )
+        )
+
+        # Register sigterm handler
+        signal.signal(signal.SIGTERM, self.sigterm_handler)
+
+    def after_click(self, icon, query):
+        if str(query) == "quit":
+            logger.info("quit by user")
+            self.lockscreen.stop()
+            icon.stop()
+
+    def sigterm_handler(self, *args, **kwargs):
+        """ Gracefully shutdown, put last entry to time logger"""
+        self.outputter.out_signal()
+        self.lockscreen.stop()
+        self.app.stop()
+        logger.info("Killed by sigterm, shutting down")
+
+    def setup_lockscreen_loop(self, icon):
+        self.lockscreen = LockScreen(self.ledger)
+        icon.visible = True
+        self.lockscreen.start()
+
+    def run(self):
+        self.app.run(self.setup_lockscreen_loop)

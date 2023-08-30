@@ -1,36 +1,41 @@
 import Foundation
 from AppKit import NSObject
 from PyObjCTools import AppHelper
+from .ledgers import ledger_factory
+from .platformctx import PunchStrategy
+
 import logging
 
 logger = logging.getLogger(__name__)
 
+
 class GetScreensaver(NSObject):
-    outputter = None
+    ledger = None
 
     def screenIsLocked_(self, islocked):
         logger.debug('screenIsLocked')
-        self.outputter.out_signal()
-        # print(islocked)
+        self.ledger.out_signal()
 
     def screenIsUnlocked(self):
         logger.debug('screenIsUnLocked')
-        self.outputter.in_signal()
+        self.ledger.in_signal()
 
 
-class LockScreen(object):
-    def __init__(self, outputter):
-        self.outputter = outputter
+class LockScreen(PunchStrategy):
+    def __init__(self, **kwargs):
+        self.config = kwargs
+        self.ledger = ledger_factory(**self.config)
+
         self.nc = Foundation.NSDistributedNotificationCenter.defaultCenter()
         self.get_screensaver = GetScreensaver.new()
-        self.get_screensaver.outputter = outputter
+        self.get_screensaver.ledger = self.ledger
         self.nc.addObserver_selector_name_object_(self.get_screensaver, 'screenIsLocked:', 'com.apple.screenIsLocked', None)
         self.nc.addObserver_selector_name_object_(self.get_screensaver, 'screenIsUnlocked', 'com.apple.screenIsUnlocked', None)
 
-    def start(self):
+    def run(self):
         try:
             logger.info('Starting eventloop')
             AppHelper.runConsoleEventLoop()
         except KeyboardInterrupt:
-            self.outputter.out_signal()
+            self.ledger.out_signal()
             logger.exception("KeyboardInterrrupt, shutting down")
