@@ -115,6 +115,8 @@ class LinuxStrategy(PunchStrategy):
             'bundyclock',
             icon=Image.open(resource_filename(__name__, 'service_files/bundyclock.png')),
             menu=pystray.Menu(
+                pystray.MenuItem('take a break', self.after_click),
+                pystray.Menu.SEPARATOR,
                 pystray.MenuItem('show time today', self.after_click),
                 pystray.Menu.SEPARATOR,
                 pystray.MenuItem('quit', self.after_click),
@@ -133,6 +135,8 @@ class LinuxStrategy(PunchStrategy):
             self.ledger.update_in_out()
             today_time = self.ledger.get_today()
             self.app.notify(f"Start: {today_time.intime}. Time elapsed: {today_time.total}", "Bundyclock")
+        elif str(query) == "take a break":
+            self.ledger.take_a_break()
 
     def sigterm_handler(self, *args, **kwargs):
         """ Gracefully shutdown, put last entry to time logger"""

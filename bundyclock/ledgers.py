@@ -35,6 +35,9 @@ class BundyLedger:
     def get_today(self):
         pass
 
+    def take_a_break(self):
+        logger.error("Bundy says no! Go back to work")
+
     @staticmethod
     def calc_tot_time(t_in, t_out):
         delta_t = (datetime.datetime(*time.strptime(t_out, '%H:%M:%S')[:7]) -

@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="bundyclock",
-    version="1.3.0",
+    version="1.4.0",
     description='Automatic Bundy Clock',
     author="Dan Hallgren",
     author_email="dan.hallgren@gmail.com",
