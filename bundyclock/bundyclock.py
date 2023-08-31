@@ -18,17 +18,21 @@ from pkg_resources import resource_string
 from subprocess import Popen, PIPE
 from time import strftime
 from sys import platform
+
+import bundyclock
 if platform == "linux" or platform == "linux2":
     # linux
-    from . import lockscreen
+    from .lockscreen import LinuxStrategy as Strategy
 elif platform == "darwin":
-    from . import cocoaevent as lockscreen
+    from .cocoaevent import LockScreen as Strategy
     # OS X
 elif platform == "win32":
-    raise Exception("Platform not supported")
+    # Windows
+    from .wmilockscreen import LockScreen as Strategy
 
 from . import ledgers
 from . import report
+from .platformctx import PlatformCtx
 
 
 logger = logging.getLogger(__name__)
@@ -38,6 +42,10 @@ CONFIG = """[bundyclock]
 # ledger_type, choose from (text, json, sqlite, http-rest)
 ledger_type = sqlite
 ledger_file = in_out_times.db
+
+# logging, default is to stdout. Uncomment to log to file
+# log_file = bundyclock.log
+
 # jinja2 report template used with --report option
 template = default_report.j2
 url = http://localhost:8000/bundyclock/api/workdays/
@@ -54,6 +62,14 @@ def working_dir(work_dir):
         yield
     finally:
         os.chdir(curr_dir)
+
+
+def setup_file_logger(log_file):
+    fileHandler = logging.FileHandler(log_file)
+    logFormatter = logging.Formatter(bundyclock.LOG_FORMAT)
+    fileHandler.setFormatter(logFormatter)
+    rootLogger = logging.getLogger()
+    rootLogger.addHandler(fileHandler)
 
 
 def main():
@@ -119,20 +135,30 @@ def main():
             with open(os.path.join(curr_dir, os.path.expanduser(args.config[0])), 'a') as s:
                 s.writelines(CONFIG)
 
-        ledger = ledgers.ledger_factory(**config._sections['bundyclock'])
+        log_file_name = config._sections['bundyclock'].get('log_file', None)
+        if log_file_name:
+            setup_file_logger(log_file=log_file_name)
 
         if args.daemon:
-            lock_screen_logger = lockscreen.LockScreen(ledger)
-            ledger.in_signal()
-            lock_screen_logger.start()
+            try:
+                is_gui = not sys.stdin.isatty()
+            except AttributeError:
+                is_gui = True
+            logger.info("Starting bundyclock daemon in {mode} mode"
+                        .format(mode="GUI" if is_gui else "terminal"))
+
+            ctx = PlatformCtx(Strategy(**config._sections['bundyclock']))
+            ctx.run()
 
         elif args.report:
+            ledger = ledgers.ledger_factory(**config._sections['bundyclock'])
             if ledger.can_report:
                 print(report.render(args.report, ledger, config.get('bundyclock', 'template')))
             else:
                 sys.exit('\t--report not supported by "{}" ledger type'.format(config.get('bundyclock', 'ledger_type')))
 
         else:
+            ledger = ledgers.ledger_factory(**config._sections['bundyclock'])
             ledger.out_signal()
             print(ledger.get_today())
 
