@@ -1,8 +1,9 @@
 import wmi
 import logging
 import pystray
+from pkg_resources import resource_filename
+from PIL import Image
 from queue import Queue, Empty
-from . import _icon
 from .platformctx import PunchStrategy
 from .ledgers import ledger_factory
 
@@ -17,17 +18,17 @@ class LockScreen(PunchStrategy):
 
         self.gui_icon = pystray.Icon(
             'bundyclock',
-            icon=_icon.create_image(64, 64, 'black', 'white'),
+            icon=Image.open(resource_filename(__name__, 'service_files/bundyclock.png')),
             title="Bundyclock",
             menu=pystray.Menu(
-                pystray.MenuItem('quit', self.after_click),
+                pystray.MenuItem('show time today', self.after_click),
                 pystray.Menu.SEPARATOR,
-                pystray.MenuItem('today', self.after_click),
+                pystray.MenuItem('quit', self.after_click),
             )
         )
 
     def after_click(self, icon, query):
-        if str(query) == "today":
+        if str(query) == "show time today":
             self.queue.put("notify_today")
         elif str(query) == "quit":
             logger.info("quit by user")
@@ -57,15 +58,18 @@ class LockScreen(PunchStrategy):
                     logger.info('screenIsUnLocked')
                     self.ledger.in_signal()
             except wmi.x_wmi_timed_out:
-                if not self.gui_icon._thread.is_alive():
-                    logger.debug('gui is dead, quitting')
-                    break
-                try:
-                    message = self.queue.get(block=False)
-                    logger.debug(f"got message: {message}")
-                except Empty:
-                    message = None
-                if message == "notify_today":
-                    self.ledger.update_in_out()
-                    today_time = self.ledger.get_today()
-                    self.gui_icon.notify(f"Start: {today_time.intime}. Time elapsed: {today_time.total}", "Bundyclock")
+                pass
+
+            if not self.gui_icon._thread.is_alive():
+                logger.debug('gui is dead, quitting')
+                break
+
+            try:
+                message = self.queue.get(block=False)
+                logger.debug(f"got message: {message}")
+            except Empty:
+                message = None
+            if message == "notify_today":
+                self.ledger.update_in_out()
+                today_time = self.ledger.get_today()
+                self.gui_icon.notify(f"Start: {today_time.intime}. Time elapsed: {today_time.total}", "Bundyclock")
