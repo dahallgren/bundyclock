@@ -144,8 +144,8 @@ def main():
                 is_gui = not sys.stdin.isatty()
             except AttributeError:
                 is_gui = True
-            logger.debug("Starting bundyclock daemon in {mode} mode"
-                         .format(mode="GUI" if is_gui else "terminal"))
+            logger.info("Starting bundyclock daemon in {mode} mode"
+                        .format(mode="GUI" if is_gui else "terminal"))
 
             ctx = PlatformCtx(Strategy(**config._sections['bundyclock']))
             ctx.run()
