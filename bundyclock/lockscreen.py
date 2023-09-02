@@ -20,13 +20,13 @@ logger = logging.getLogger(__name__)
 
 class LockScreen(object):
     """ Logger for lock/unlock screen """
-    def __init__(self, outputter):
+    def __init__(self, ledger):
         from dbus.mainloop.glib import DBusGMainLoop
         DBusGMainLoop(set_as_default=True)
         from gi.repository import GObject
         self.loop = GObject.MainLoop()
         self.bus = dbus.SessionBus()
-        self.outputter = outputter
+        self.ledger = ledger
 
         self.screen_saver_proxy, is_unity = self._get_screen_saver_proxy()
 
@@ -77,27 +77,27 @@ class LockScreen(object):
         """ handle gnome screen saver signals """
         if dbus_screen_active:
             logger.debug('gnome: lock screen')
-            self.outputter.out_signal()
+            self.ledger.out_signal()
         else:
             logger.debug('gnome: unlock screen')
-            self.outputter.in_signal()
+            self.ledger.in_signal()
 
     def locked_handler(self, sender=None):
         """ hanlde unity lock screen """
         logger.debug('Unity: lock screen')
-        self.outputter.out_signal()
+        self.ledger.out_signal()
 
     def unlocked_handler(self, sender=None):
         """ handle unity unlock screen """
         logger.debug('Unity unlock screen')
-        self.outputter.in_signal()
+        self.ledger.in_signal()
 
     def start(self):
         """ start main loop """
         try:
             self.loop.run()
         except KeyboardInterrupt:
-            self.outputter.out_signal()
+            self.ledger.out_signal()
             logger.exception("KeyboardInterrrupt, shutting down")
         logger.debug('lockscreen loop stopped')
 
@@ -140,7 +140,7 @@ class LinuxStrategy(PunchStrategy):
 
     def sigterm_handler(self, *args, **kwargs):
         """ Gracefully shutdown, put last entry to time logger"""
-        self.outputter.out_signal()
+        self.ledger.out_signal()
         self.lockscreen.stop()
         self.app.stop()
         logger.info("Killed by sigterm, shutting down")
