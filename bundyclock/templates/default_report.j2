@@ -1,12 +1,10 @@
-{% set lunch_break = 25 -%}
-
 Report for {{ month }}
 =====================
 
+{{ '{: ^10}'.format('Date') }}| {{ '{: ^8}'.format('In') }}| {{ '{: ^7}'.format('Out') }}| {{ '{: ^7}'.format('Total') }}| {{ '{: ^7}'.format('Breaks') }}| {{ '{: ^14}'.format('Break length') }}| {{ '{: ^12}'.format('Time worked') }}
+{{ '{:_^80}'.format('') }}
 {% for day in (workdays|sort(attribute='day')) -%}
-{{ day.day }}: In {{ day.intime }} Out: {{ day.outtime }} Total: {{ day.total }}
+{% set working_hours = (day.total|str2sec) - day.break_secs|default(0,true) -%}
+{{ '%-10s'|format(day.day) }}| {{ '%-8s'|format(day.intime) }} {{ '%-8s'|format(day.outtime) }} {{ '%-8s'|format(day.total) }} {{ '{: ^7}'.format(day.num_breaks) }} {{ '{: ^16}'.format(day.break_secs | sec2str) }} {{  '{: ^12}'.format(working_hours|sec2str) }}
 {% endfor %}
-Total this month: {{ total_month }}
-{% set total_lunch = lunch_break *(workdays | length) -%}
-
-Total with avarage {{ lunch_break }} min. lunch: {{ total_month | lunch(total_lunch) }}
+Total this month: {{ total_month }}, excluding break time {{ (totals.total_day - totals.total_break) | sec2str }}

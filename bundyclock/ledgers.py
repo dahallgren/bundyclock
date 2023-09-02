@@ -51,14 +51,23 @@ class BundyLedger:
 
 
 class PunchTime(object):
-    def __init__(self, day, intime, outtime, total):
+    def __init__(self, day, intime, outtime, total, num_breaks=0, break_secs=0):
         self.day = day
         self.intime = intime
         self.outtime = outtime
         self.total = total
+        self.num_breaks = num_breaks
+        self.break_secs = break_secs
 
     def __str__(self):
-        return '{} - In: {} Out: {} Total: {}'.format(self.day, self.intime, self.outtime, self.total)
+        return f"{self.day} - In: {self.intime} Out: {self.outtime} Total: {self.total}. "\
+            f"Breaks today {self.num_breaks} - {self.break_time}"
+
+    @property
+    def break_time(self) -> str:
+        h, s = divmod(self.break_secs, 3600)
+        m, s = divmod(s, 60)
+        return "%02d:%02d:%02d" % (h, m, s)
 
 
 def ledger_factory(**kwargs):
@@ -217,10 +226,15 @@ class SqLiteOutput(BundyLedger):
 
         user_version = db.execute('PRAGMA user_version').fetchone()[0]
         if user_version < 1:
-            self._migrate_00_01_date_format()
+            user_version = self._migrate_00_01_date_format()
+
+        if user_version == 1:
+            user_version = self._migrate_01_02_create_breaks_table()
 
     def _migrate_00_01_date_format(self):
         logger.info("Applying migration 'date format'")
+        NEXT_VERSION = 1
+
         cur = self.db.execute('SELECT day from workdays')
         updated_rows = 0
         all_rows = cur.fetchall()
@@ -233,10 +247,31 @@ class SqLiteOutput(BundyLedger):
             except ValueError:
                 continue
 
-        self.db.execute('PRAGMA user_version = 1')
+        self.db.execute(f'PRAGMA user_version = {NEXT_VERSION}')
         self.db.commit()
 
         logger.info("Updated {} of {} rows".format(updated_rows, len(all_rows)))
+        return NEXT_VERSION
+
+    def _migrate_01_02_create_breaks_table(self):
+        logger.info("Starting 01->02 migration...")
+        NEXT_VERSION = 2
+
+        self.db.executescript(
+            '''
+            CREATE TABLE IF NOT EXISTS breaks (
+                id  INTEGER PRIMARY KEY,
+                day TEXT NOT NULL,
+                start TEXT NOT NULL,
+                end TEXT NULL
+            );
+            ''')
+
+        self.db.execute(f'PRAGMA user_version = {NEXT_VERSION}')
+        self.db.commit()
+
+        logger.info("Finished migration. Created breaks table")
+        return NEXT_VERSION
 
     def update_in_out(self):
         cur = self.db.execute("SELECT day, intime, outtime, total FROM workdays WHERE day=date('now')")
@@ -264,23 +299,21 @@ class SqLiteOutput(BundyLedger):
             self.db.commit()
 
     def in_signal(self):
+        self._handle_return_from_break()
         self.update_in_out()
 
     def out_signal(self):
         self.update_in_out()
 
-    def insert_new_entry(self, day, intime, outtime, total):
-        self.db.execute(
-            'INSERT INTO workdays VALUES (?,?,?,?)', (
-                day,
-                intime,
-                outtime,
-                total
-            ))
-        self.db.commit()
-
     def get_today(self, day=None):
-        cur = self.db.execute("SELECT day, intime, outtime, total FROM workdays WHERE day = date('now')")
+        cur = self.db.execute("""
+                              SELECT w.*, COUNT(b.id) AS num_breaks,
+                                SUM(strftime('%s', b.end)-strftime('%s', b.start)) AS break_secs
+                              FROM workdays w
+                              LEFT OUTER JOIN breaks b on w.day=b.day
+                              WHERE w.day = date('now')
+                              """
+                              )
         current = cur.fetchone()
 
         return PunchTime(**dict(current))
@@ -293,9 +326,12 @@ class SqLiteOutput(BundyLedger):
 
         cur = self.db.execute(
             """
-            SELECT *
-            from workdays
-            WHERE day LIKE ?
+            SELECT w.*, COUNT(b.id) AS num_breaks, SUM(strftime('%s', b.end)-strftime('%s', b.start)) AS break_secs
+            FROM workdays w
+            LEFT OUTER JOIN breaks b on w.day=b.day
+            WHERE w.day LIKE ?
+            GROUP BY w.day
+            ORDER BY w.day
             """, (month,))
 
         return cur.fetchall()
@@ -308,19 +344,43 @@ class SqLiteOutput(BundyLedger):
 
         cur = self.db.execute(
             """
-            SELECT SUM(strftime('%s', total)-strftime('%s', '00:00:00'))
-            from workdays
-            WHERE strftime('%s', day) BETWEEN strftime('%s', ?) AND strftime('%s', ?)
+            SELECT SUM(DISTINCT(strftime('%s', total))-strftime('%s', '00:00:00')) AS total_day,
+                SUM(strftime('%s', b.end)-strftime('%s', b.start)) AS total_break
+            from workdays w
+            LEFT OUTER JOIN breaks b ON w.day=b.day
+            WHERE strftime('%s', w.day) BETWEEN strftime('%s', ?) AND strftime('%s', ?)
             """, (start_date, end_date))
 
-        try:
-            h, s = divmod(cur.fetchone()[0], 3600)
-            m, s = divmod(s, 60)
-        except TypeError:
-            h, m, s = (0, 0, 0)
+        return cur.fetchone()
 
-        total_time = "%02d:%02d:%02d" % (h, m, s)
-        return total_time
+    def take_a_break(self):
+        # start break by saving break record
+        self.db.execute("INSERT INTO breaks (day, start) VALUES (date('now'),?)", (
+                time.strftime('%H:%M:%S'),
+                ))
+        self.db.commit()
+        logger.debug("Saved start break time")
+
+    def _handle_return_from_break(self):
+        cur = self.db.execute("""
+                              SELECT * FROM breaks WHERE day = date('now') AND end is NULL ORDER BY start DESC;
+                              """
+                              )
+        latest_break_record = cur.fetchone()
+        if latest_break_record:
+            cur = self.db.execute("UPDATE breaks SET end=? WHERE id=?", (
+                time.strftime('%H:%M:%S'),
+                latest_break_record['id'],
+                ))
+            self.db.commit()
+            logger.info("End break")
+            self._prune_stale_break_records()
+
+    def _prune_stale_break_records(self):
+        cur = self.db.execute("DELETE FROM breaks WHERE end is NULL")
+        if cur.rowcount:
+            logger.info(f"Deleting {cur.rowcount} stale break records")
+            self.db.commit()
 
 
 class BundyHttpRest(BundyLedger):
@@ -432,17 +492,3 @@ class BundyHttpRest(BundyLedger):
 
         except requests.exceptions.ConnectionError as e:
             logger.exception("Connection proplem: {}".format(e))
-
-
-def migrate_from_json(jsonfile, dbfile):
-    db = SqLiteOutput(dbfile)
-
-    with open(jsonfile, 'r') as s:
-        data = json.load(s)
-
-    for day, times in sorted(data.items()):
-        try:
-            db.insert_new_entry(day, times['in'], times['out'], times['total'])
-        except sqlite3.IntegrityError as e:
-            logger.exception(day)
-            raise e

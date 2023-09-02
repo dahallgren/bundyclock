@@ -8,7 +8,7 @@ import logging
 import os
 import pystray
 import signal
-from pkg_resources import resource_string, resource_filename
+from pkg_resources import resource_filename
 from PIL import Image
 from time import sleep
 from .platformctx import PunchStrategy
@@ -134,7 +134,9 @@ class LinuxStrategy(PunchStrategy):
         elif str(query) == 'show time today':
             self.ledger.update_in_out()
             today_time = self.ledger.get_today()
-            self.app.notify(f"Start: {today_time.intime}. Time elapsed: {today_time.total}", "Bundyclock")
+            self.app.notify(f"Start: {today_time.intime}. Time elapsed: {today_time.total}\n"
+                            f"Breaks {today_time.num_breaks} - {today_time.break_time}",
+                            "Bundyclock")
         elif str(query) == "take a break":
             self.ledger.take_a_break()
 
