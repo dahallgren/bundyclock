@@ -7,4 +7,4 @@ Report for {{ month }}
 {% set working_hours = (day.total|str2sec) - day.break_secs|default(0,true) -%}
 {{ '%-10s'|format(day.day) }}| {{ '%-8s'|format(day.intime) }} {{ '%-8s'|format(day.outtime) }} {{ '%-8s'|format(day.total) }} {{ '{: ^7}'.format(day.num_breaks) }} {{ '{: ^16}'.format(day.break_secs | sec2str) }} {{  '{: ^12}'.format(working_hours|sec2str) }}
 {% endfor %}
-Total this month: {{ total_month }}, excluding break time {{ (totals.total_day - totals.total_break) | sec2str }}
+Total this month: {{ total_month }}, excluding break time {{ (totals.total_day|default(0,true) - totals.total_break|default(0, true)) | sec2str }}
