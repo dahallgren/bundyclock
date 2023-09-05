@@ -8,7 +8,7 @@ import logging
 import os
 import pystray
 import signal
-from pkg_resources import resource_string, resource_filename
+from pkg_resources import resource_filename
 from PIL import Image
 from time import sleep
 from .platformctx import PunchStrategy
@@ -20,13 +20,13 @@ logger = logging.getLogger(__name__)
 
 class LockScreen(object):
     """ Logger for lock/unlock screen """
-    def __init__(self, outputter):
+    def __init__(self, ledger):
         from dbus.mainloop.glib import DBusGMainLoop
         DBusGMainLoop(set_as_default=True)
         from gi.repository import GObject
         self.loop = GObject.MainLoop()
         self.bus = dbus.SessionBus()
-        self.outputter = outputter
+        self.ledger = ledger
 
         self.screen_saver_proxy, is_unity = self._get_screen_saver_proxy()
 
@@ -77,27 +77,27 @@ class LockScreen(object):
         """ handle gnome screen saver signals """
         if dbus_screen_active:
             logger.debug('gnome: lock screen')
-            self.outputter.out_signal()
+            self.ledger.out_signal()
         else:
             logger.debug('gnome: unlock screen')
-            self.outputter.in_signal()
+            self.ledger.in_signal()
 
     def locked_handler(self, sender=None):
         """ hanlde unity lock screen """
         logger.debug('Unity: lock screen')
-        self.outputter.out_signal()
+        self.ledger.out_signal()
 
     def unlocked_handler(self, sender=None):
         """ handle unity unlock screen """
         logger.debug('Unity unlock screen')
-        self.outputter.in_signal()
+        self.ledger.in_signal()
 
     def start(self):
         """ start main loop """
         try:
             self.loop.run()
         except KeyboardInterrupt:
-            self.outputter.out_signal()
+            self.ledger.out_signal()
             logger.exception("KeyboardInterrrupt, shutting down")
         logger.debug('lockscreen loop stopped')
 
@@ -115,6 +115,8 @@ class LinuxStrategy(PunchStrategy):
             'bundyclock',
             icon=Image.open(resource_filename(__name__, 'service_files/bundyclock.png')),
             menu=pystray.Menu(
+                pystray.MenuItem('take a break', self.after_click),
+                pystray.Menu.SEPARATOR,
                 pystray.MenuItem('show time today', self.after_click),
                 pystray.Menu.SEPARATOR,
                 pystray.MenuItem('quit', self.after_click),
@@ -132,11 +134,15 @@ class LinuxStrategy(PunchStrategy):
         elif str(query) == 'show time today':
             self.ledger.update_in_out()
             today_time = self.ledger.get_today()
-            self.app.notify(f"Start: {today_time.intime}. Time elapsed: {today_time.total}", "Bundyclock")
+            self.app.notify(f"Start: {today_time.intime}. Time elapsed: {today_time.total}\n"
+                            f"Breaks {today_time.num_breaks} - {today_time.break_time}",
+                            "Bundyclock")
+        elif str(query) == "take a break":
+            self.ledger.take_a_break()
 
     def sigterm_handler(self, *args, **kwargs):
         """ Gracefully shutdown, put last entry to time logger"""
-        self.outputter.out_signal()
+        self.ledger.out_signal()
         self.lockscreen.stop()
         self.app.stop()
         logger.info("Killed by sigterm, shutting down")

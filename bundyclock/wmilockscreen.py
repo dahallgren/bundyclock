@@ -21,6 +21,8 @@ class LockScreen(PunchStrategy):
             icon=Image.open(resource_filename(__name__, 'service_files/bundyclock.png')),
             title="Bundyclock",
             menu=pystray.Menu(
+                pystray.MenuItem('take a break', self.after_click),
+                pystray.Menu.SEPARATOR,
                 pystray.MenuItem('show time today', self.after_click),
                 pystray.Menu.SEPARATOR,
                 pystray.MenuItem('quit', self.after_click),
@@ -33,6 +35,8 @@ class LockScreen(PunchStrategy):
         elif str(query) == "quit":
             logger.info("quit by user")
             icon.stop()
+        elif str(query) == "take a break":
+            self.queue.put('take_a_break')
 
     def run(self):
         logger.debug('wmi lockscreen checker started')
@@ -72,4 +76,8 @@ class LockScreen(PunchStrategy):
             if message == "notify_today":
                 self.ledger.update_in_out()
                 today_time = self.ledger.get_today()
-                self.gui_icon.notify(f"Start: {today_time.intime}. Time elapsed: {today_time.total}", "Bundyclock")
+                self.gui_icon.notify(f"Start: {today_time.intime}. Time elapsed: {today_time.total}\n"
+                                     f"Breaks today {today_time.num_breaks} - {today_time.break_time}",
+                                     "Bundyclock")
+            elif message == "take_a_break":
+                self.ledger.take_a_break()
