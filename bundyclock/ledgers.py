@@ -65,8 +65,11 @@ class PunchTime(object):
 
     @property
     def break_time(self) -> str:
-        h, s = divmod(self.break_secs, 3600)
-        m, s = divmod(s, 60)
+        try:
+            h, s = divmod(self.break_secs, 3600)
+            m, s = divmod(s, 60)
+        except TypeError:
+            (h, m, s) = (0, 0, 0)
         return "%02d:%02d:%02d" % (h, m, s)
 
 
