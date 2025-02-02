@@ -116,7 +116,6 @@ class LinuxStrategy(PunchStrategy):
 
     def action(self, query):
         if query == 'quit':
-            self.ledger.out_signal()
             self.lockscreen.stop()
 
     def sigterm_handler(self, *args, **kwargs):

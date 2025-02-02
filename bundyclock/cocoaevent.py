@@ -37,7 +37,6 @@ class LockScreen(PunchStrategy):
 
     def action(self, query):
         if query == 'quit':
-            self.ledger.out_signal()
             AppHelper.stopEventLoop()
 
     def run(self):

@@ -17,7 +17,7 @@ class SqLiteOutput(BundyLedger):
 
     def __init__(self, filename):
 
-        db = sqlite3.connect(filename)
+        db = sqlite3.connect(filename, check_same_thread=False)
         db.row_factory = sqlite3.Row  # Make sure we can access columns by name
 
         db.executescript(

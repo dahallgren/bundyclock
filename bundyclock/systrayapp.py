@@ -25,6 +25,7 @@ class SystrayApp(pystray.Icon):
 
     def after_click(self, icon, query):
         if str(query) == "quit":
+            self.ledger.update_in_out()
             logger.info("quit by user")
             icon.stop()
         elif str(query) == 'show time today':
