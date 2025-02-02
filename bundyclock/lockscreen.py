@@ -6,13 +6,11 @@ Copyright (c) 2018 Dan Hallgren  <dan.hallgren@gmail.com>
 import dbus
 import logging
 import os
-import pystray
 import signal
-from pkg_resources import resource_filename
-from PIL import Image
 from time import sleep
 from .platformctx import PunchStrategy
 from .ledgers.factory import get_ledger as ledger_factory
+from .systrayapp import SystrayApp
 
 
 logger = logging.getLogger(__name__)
@@ -111,34 +109,15 @@ class LinuxStrategy(PunchStrategy):
         self.ledger = ledger_factory(**self.config)
         self.ledger.in_signal()
 
-        self.app = pystray.Icon(
-            'bundyclock',
-            icon=Image.open(resource_filename(__name__, 'service_files/bundyclock.png')),
-            menu=pystray.Menu(
-                pystray.MenuItem('take a break', self.after_click),
-                pystray.Menu.SEPARATOR,
-                pystray.MenuItem('show time today', self.after_click),
-                pystray.Menu.SEPARATOR,
-                pystray.MenuItem('quit', self.after_click),
-            )
-        )
+        self.app = SystrayApp(ledger=self.ledger, actioncb=self.action)
 
         # Register sigterm handler
         signal.signal(signal.SIGTERM, self.sigterm_handler)
 
-    def after_click(self, icon, query):
-        if str(query) == "quit":
-            logger.info("quit by user")
+    def action(self, query):
+        if query == 'quit':
+            self.ledger.out_signal()
             self.lockscreen.stop()
-            icon.stop()
-        elif str(query) == 'show time today':
-            self.ledger.update_in_out()
-            today_time = self.ledger.get_today()
-            self.app.notify(f"Start: {today_time.intime}. Time elapsed: {today_time.total}\n"
-                            f"Breaks {today_time.num_breaks} - {today_time.break_time}",
-                            "Bundyclock")
-        elif str(query) == "take a break":
-            self.ledger.take_a_break()
 
     def sigterm_handler(self, *args, **kwargs):
         """ Gracefully shutdown, put last entry to time logger"""
