@@ -1,7 +1,6 @@
 import re
 
 from calendar import monthrange
-from dateutil.parser import parse as guess_date
 
 import jinja2
 
@@ -34,8 +33,7 @@ def _str2sec(time_hms):
     return seconds
 
 
-def render(some_date, ledger, template):
-    year_month = guess_date(some_date).strftime('%Y-%m')
+def render(year_month, ledger, template):
     start_date = re.sub(r'(\d{4})-(\d{2}).*', r'\1-\2-01', year_month)
     last_day_of_month = monthrange(*map(int, year_month.split('-')[:2]))[1]
     end_date = re.sub(r'(\d{4})-(\d{2}).*', r'\1-\2-{}', year_month) \

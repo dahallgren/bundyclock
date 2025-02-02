@@ -14,6 +14,7 @@ import configparser
 import contextlib
 import logging
 
+from dateutil.parser import parse as guess_date
 from pkg_resources import resource_string
 from subprocess import Popen, PIPE
 from time import strftime
@@ -91,6 +92,13 @@ def main():
     parser.add_argument('--config', nargs=1, metavar='CONFIG_FILE',
                         help='alternative configuration', default=['~/.bundyclock/bundyclock.cfg'])
 
+    subparsers = parser.add_subparsers(dest='subcommand')
+    parser_notes = subparsers.add_parser('note', help='add notes to ledger')
+    parser_notes.add_argument('note', nargs=1, help='note to add', type=str)
+    parser_notes.add_argument('--date', '-d', action='store', metavar='YYYY-MM-DD',
+                              help='date of note', default=strftime('%Y-%m-%d'))
+
+
     args = parser.parse_args()
 
     home = os.path.expanduser('~')
@@ -139,6 +147,10 @@ def main():
         if log_file_name:
             setup_file_logger(log_file=log_file_name)
 
+        if args.subcommand == 'note':
+            ledger = ledgers.ledger_factory(**config._sections['bundyclock'])
+            ledger.add_note(args.note[0], guess_date(args.date).strftime('%Y-%m-%d'))
+
         if args.daemon:
             try:
                 is_gui = not sys.stdin.isatty()
@@ -153,7 +165,8 @@ def main():
         elif args.report:
             ledger = ledgers.ledger_factory(**config._sections['bundyclock'])
             if ledger.can_report:
-                print(report.render(args.report, ledger, config.get('bundyclock', 'template')))
+                year_month = guess_date(args.report).strftime('%Y-%m')
+                print(report.render(year_month, ledger, config.get('bundyclock', 'template')))
             else:
                 sys.exit('\t--report not supported by "{}" ledger type'.format(config.get('bundyclock', 'ledger_type')))
 

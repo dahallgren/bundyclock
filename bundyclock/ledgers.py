@@ -234,6 +234,9 @@ class SqLiteOutput(BundyLedger):
         if user_version == 1:
             user_version = self._migrate_01_02_create_breaks_table()
 
+        if user_version == 2:
+            user_version = self._migrate_02_03_create_notes_table()
+
     def _migrate_00_01_date_format(self):
         logger.info("Applying migration 'date format'")
         NEXT_VERSION = 1
@@ -275,6 +278,26 @@ class SqLiteOutput(BundyLedger):
 
         logger.info("Finished migration. Created breaks table")
         return NEXT_VERSION
+
+    def _migrate_02_03_create_notes_table(self):
+        logger.info("Starting 02->03 migration...")
+        NEXT_VERSION = 3
+
+        self.db.executescript(
+            '''
+            CREATE TABLE IF NOT EXISTS notes (
+                id  INTEGER PRIMARY KEY,
+                day TEXT NOT NULL,
+                note TEXT NOT NULL
+            );
+            ''')
+
+        self.db.execute(f'PRAGMA user_version = {NEXT_VERSION}')
+        self.db.commit()
+
+        logger.info("Finished migration. Created notes table")
+        return NEXT_VERSION
+
 
     def update_in_out(self):
         cur = self.db.execute("SELECT day, intime, outtime, total FROM workdays WHERE day=date('now')")
@@ -329,9 +352,10 @@ class SqLiteOutput(BundyLedger):
 
         cur = self.db.execute(
             """
-            SELECT w.*, COUNT(b.id) AS num_breaks, SUM(strftime('%s', b.end)-strftime('%s', b.start)) AS break_secs
+            SELECT w.*, COUNT(b.id) AS num_breaks, SUM(strftime('%s', b.end)-strftime('%s', b.start)) AS break_secs , GROUP_CONCAT(n.note, ", ") AS notes
             FROM workdays w
             LEFT OUTER JOIN breaks b on w.day=b.day
+            LEFT OUTER JOIN notes n on w.day=n.day
             WHERE w.day LIKE ?
             GROUP BY w.day
             ORDER BY w.day
@@ -384,6 +408,13 @@ class SqLiteOutput(BundyLedger):
         if cur.rowcount:
             logger.info(f"Deleting {cur.rowcount} stale break records")
             self.db.commit()
+
+    def add_note(self, note, date):
+        self.db.execute("INSERT INTO notes (day, note) VALUES (?,?)", (
+            date,
+            note,
+            ))
+        self.db.commit()
 
 
 class BundyHttpRest(BundyLedger):
