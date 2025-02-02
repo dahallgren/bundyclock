@@ -31,7 +31,7 @@ elif platform == "win32":
     # Windows
     from .wmilockscreen import LockScreen as Strategy
 
-from . import ledgers
+from .ledgers.factory import get_ledger as ledger_factory
 from . import report
 from .platformctx import PlatformCtx
 
@@ -148,7 +148,7 @@ def main():
             setup_file_logger(log_file=log_file_name)
 
         if args.subcommand == 'note':
-            ledger = ledgers.ledger_factory(**config._sections['bundyclock'])
+            ledger = ledger_factory(**config._sections['bundyclock'])
             ledger.add_note(args.note[0], guess_date(args.date).strftime('%Y-%m-%d'))
 
         if args.daemon:
@@ -163,7 +163,7 @@ def main():
             ctx.run()
 
         elif args.report:
-            ledger = ledgers.ledger_factory(**config._sections['bundyclock'])
+            ledger = ledger_factory(**config._sections['bundyclock'])
             if ledger.can_report:
                 year_month = guess_date(args.report).strftime('%Y-%m')
                 print(report.render(year_month, ledger, config.get('bundyclock', 'template')))
@@ -171,7 +171,7 @@ def main():
                 sys.exit('\t--report not supported by "{}" ledger type'.format(config.get('bundyclock', 'ledger_type')))
 
         else:
-            ledger = ledgers.ledger_factory(**config._sections['bundyclock'])
+            ledger = ledger_factory(**config._sections['bundyclock'])
             ledger.out_signal()
             print(ledger.get_today())
 

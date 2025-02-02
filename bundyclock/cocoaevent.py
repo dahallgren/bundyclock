@@ -4,8 +4,9 @@ from AppKit import NSObject
 from pkg_resources import resource_filename
 from PIL import Image
 from PyObjCTools import AppHelper
-from .ledgers import ledger_factory
 from .platformctx import PunchStrategy
+
+from .ledgers.factory import get_ledger as ledger_factory
 
 import logging
 

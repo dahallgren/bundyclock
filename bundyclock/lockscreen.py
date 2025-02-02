@@ -12,7 +12,7 @@ from pkg_resources import resource_filename
 from PIL import Image
 from time import sleep
 from .platformctx import PunchStrategy
-from .ledgers import ledger_factory
+from .ledgers.factory import get_ledger as ledger_factory
 
 
 logger = logging.getLogger(__name__)
