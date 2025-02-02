@@ -1,11 +1,8 @@
 import wmi
 import logging
-import pystray
-from pkg_resources import resource_filename
-from PIL import Image
-from queue import Queue, Empty
 from .platformctx import PunchStrategy
 from .ledgers.factory import get_ledger as ledger_factory
+from .systrayapp import SystrayApp
 
 logger = logging.getLogger(__name__)
 
@@ -14,29 +11,10 @@ class LockScreen(PunchStrategy):
     def __init__(self, **kwargs):
         self.config = kwargs
         self.ledger = ledger_factory(**self.config)
-        self.queue = Queue()
+        self.gui_icon = SystrayApp(ledger=self.ledger, actioncb=self.action)
 
-        self.gui_icon = pystray.Icon(
-            'bundyclock',
-            icon=Image.open(resource_filename(__name__, 'service_files/bundyclock.png')),
-            title="Bundyclock",
-            menu=pystray.Menu(
-                pystray.MenuItem('take a break', self.after_click),
-                pystray.Menu.SEPARATOR,
-                pystray.MenuItem('show time today', self.after_click),
-                pystray.Menu.SEPARATOR,
-                pystray.MenuItem('quit', self.after_click),
-            )
-        )
-
-    def after_click(self, icon, query):
-        if str(query) == "show time today":
-            self.queue.put("notify_today")
-        elif str(query) == "quit":
-            logger.info("quit by user")
-            icon.stop()
-        elif str(query) == "take a break":
-            self.queue.put('take_a_break')
+    def action(self, query):
+        pass
 
     def run(self):
         logger.debug('wmi lockscreen checker started')
@@ -67,17 +45,3 @@ class LockScreen(PunchStrategy):
             if not self.gui_icon._thread.is_alive():
                 logger.debug('gui is dead, quitting')
                 break
-
-            try:
-                message = self.queue.get(block=False)
-                logger.debug(f"got message: {message}")
-            except Empty:
-                message = None
-            if message == "notify_today":
-                self.ledger.update_in_out()
-                today_time = self.ledger.get_today()
-                self.gui_icon.notify(f"Start: {today_time.intime}. Time elapsed: {today_time.total}\n"
-                                     f"Breaks today {today_time.num_breaks} - {today_time.break_time}",
-                                     "Bundyclock")
-            elif message == "take_a_break":
-                self.ledger.take_a_break()

@@ -136,7 +136,7 @@ def main():
         sys.exit(0)
 
     with working_dir(work_dir):
-        config = configparser.SafeConfigParser()
+        config = configparser.ConfigParser()
 
         if not config.read(os.path.join(curr_dir, os.path.expanduser(args.config[0]))):
             config.readfp(io.StringIO(CONFIG))
