@@ -158,7 +158,7 @@ class SqLiteOutput(BundyLedger):
         cur = self.db.execute(
             """
             SELECT w.*, COUNT(b.id) AS num_breaks,
-                SUM(strftime('%s', b.end)-strftime('%s', b.start)) AS break_secs,
+                SUM(DISTINCT strftime('%s', b.end)-strftime('%s', b.start)) AS break_secs,
                 (SELECT GROUP_CONCAT(n.note, ", ") FROM notes n WHERE n.day=w.day) AS notes
             FROM workdays w
                  LEFT OUTER JOIN breaks b on w.day=b.day
