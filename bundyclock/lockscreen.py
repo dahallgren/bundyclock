@@ -47,14 +47,14 @@ class LockScreen(object):
         # When using systemd user service, we need to retry a couple of times before the bus is ready.
         while not ssp and timeout != 0:
 
-            try:
-                if 'ubuntu' in os.environ.get('DESKTOP_SESSION'):
-                    unity = True
-            except TypeError:
-                logger.warning("Failed to get DESKTOP_SESSION env, retrying")
-                timeout -= 1
-                sleep(1)
-                continue
+            # try:
+            #     if 'ubuntu' in os.environ.get('DESKTOP_SESSION'):
+            #         unity = True
+            # except TypeError:
+            #     logger.warning("Failed to get DESKTOP_SESSION env, retrying")
+            #     timeout -= 1
+            #     sleep(1)
+            #     continue
 
             try:
                 if unity:
