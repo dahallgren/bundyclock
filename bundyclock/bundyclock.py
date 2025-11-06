@@ -15,9 +15,10 @@ import contextlib
 import logging
 
 from dateutil.parser import parse as guess_date
-from pkg_resources import resource_string
+from importlib.resources import files
 from subprocess import Popen, PIPE
 from time import strftime
+from shutil import copy
 from sys import platform
 
 import bundyclock
@@ -112,10 +113,8 @@ def main():
             logger.info('Creating systemd user dir')
             os.mkdir(sysd_user_dir)
 
-        service_file = resource_string(__name__, 'service_files/bundyclock.service')
-
-        with open(os.path.join(sysd_user_dir, 'bundyclock.service'), 'wb+') as s:
-            s.write(service_file)
+        service_file = files('bundyclock.service_files').joinpath('bundyclock.service')
+        copy(service_file, sysd_user_dir)
 
         p = Popen('systemctl --user daemon-reload'.split(), stdout=PIPE, stderr=PIPE)
         std_out, std_err = p.communicate()
@@ -139,7 +138,7 @@ def main():
         config = configparser.ConfigParser()
 
         if not config.read(os.path.join(curr_dir, os.path.expanduser(args.config[0]))):
-            config.readfp(io.StringIO(CONFIG))
+            config.read(io.StringIO(CONFIG))
             with open(os.path.join(curr_dir, os.path.expanduser(args.config[0])), 'a') as s:
                 s.writelines(CONFIG)
 
