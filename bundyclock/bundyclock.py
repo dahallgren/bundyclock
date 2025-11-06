@@ -164,6 +164,7 @@ def main():
 
         elif args.report:
             ledger = ledger_factory(**config._sections['bundyclock'])
+            ledger.out_signal()
             if ledger.can_report:
                 year_month = guess_date(args.report).strftime('%Y-%m')
                 print(report.render(year_month, ledger, config.get('bundyclock', 'template')))
